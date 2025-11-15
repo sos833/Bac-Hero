@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import Head from 'next/head';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 
@@ -525,12 +524,6 @@ export default function Home() {
     // ================== Render ==================
     return (
         <>
-            <Head>
-                <title>Bac Hero Dashboard - لوحة بطل البكالوريا</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-            </Head>
-
              <div className="toast-container">
                 {toasts.map(toast => (
                     <div key={toast.id} className={`toast toast-${toast.type}`}>
