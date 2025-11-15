@@ -17,36 +17,6 @@ const quotes = [
     "استثمر في نفسك، فهو أفضل استثمار يمكنك القيام به.",
     "لا تخف من الفشل، بل اخشَ ألا تحاول.",
     "كل إنجاز عظيم كان في البداية مجرد حلم.",
-    "الطريق إلى النجاح دائمًا قيد الإنشاء.",
-    "ركز على التقدم، وليس على الكمال.",
-    "أنت أقوى مما تتخيل، وأذكى مما تعتقد.",
-    "الفرق بين العادي والممتاز هو القليل من الجهد الإضافي.",
-    "لا تنتظر الفرصة، بل اصنعها.",
-    "العقل هو كل شيء. ما تفكر به، تصبح عليه.",
-    "ابدأ حيث أنت. استخدم ما لديك. افعل ما تستطيع.",
-    "السر في المضي قدمًا هو البدء.",
-    "المستقبل ملك لأولئك الذين يؤمنون بجمال أحلامهم.",
-    "الإصرار على الهدف هو أول مقومات النجاح.",
-    "قطرة فوق قطرة بحر، وحكمة فوق حكمة علم.",
-    "لا يوجد مصعد للنجاح، عليك أن تصعد السلالم.",
-    "العمل الشاق يهزم الموهبة عندما لا تعمل الموهبة بجد.",
-    "لا تحسب الأيام، اجعل الأيام ذات قيمة.",
-    "الشخص الذي لم يرتكب خطأ، لم يجرب أي شيء جديد.",
-    "النجاح ليس نهائياً، والفشل ليس قاتلاً: إنها الشجاعة لمواصلة ما يهم.",
-    "آمن بنفسك، خذ تحدياتك، واحفر عميقاً بداخلك للتغلب على المخاوف.",
-    "الهدف من التعليم هو استبدال العقل الفارغ بعقل منفتح.",
-    "العبقرية هي واحد بالمائة إلهام وتسعة وتسعون بالمائة عرق.",
-    "التعليم هو أقوى سلاح يمكنك استخدامه لتغيير العالم.",
-    "السر ليس في قضاء الوقت، بل في استثمار الوقت.",
-    "النجاح رحلة وليس وجهة.",
-    "كلما عملت بجد أكبر، كلما أصبحت محظوظاً أكثر.",
-    "لا تتوقف عندما تتعب، توقف عندما تنتهي.",
-    "إذا كنت تستطيع أن تحلم به، يمكنك تحقيقه.",
-    "الدافع هو ما يجعلك تبدأ. العادة هي ما يجعلك تستمر.",
-    "النجاح هو مجموع الجهود الصغيرة التي تتكرر يوماً بعد يوم.",
-    "ليس المهم ما تعرفه، بل مدى سرعة تعلمك.",
-    "الفرق بين الفوز والخسارة غالباً ما يكون عدم الاستسلام.",
-    "الطريقة الوحيدة لعمل أشياء عظيمة هي أن تحب ما تفعله."
 ];
 
 const daysOfWeek = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
@@ -130,15 +100,19 @@ export default function Home() {
             Notification.requestPermission();
         }
         
-        const settings = JSON.parse(localStorage.getItem('bacHeroSettings')) || { dailyGoal: 180, shutdownFeature: false };
-        setDailyGoal(settings.dailyGoal);
-        setShutdownFeature(settings.shutdownFeature);
+        try {
+            const settings = JSON.parse(localStorage.getItem('bacHeroSettings')) || { dailyGoal: 180, shutdownFeature: false };
+            setDailyGoal(settings.dailyGoal);
+            setShutdownFeature(settings.shutdownFeature);
 
-        const loadedPlanned = JSON.parse(localStorage.getItem('plannedSessions')) || [];
-        setPlannedSessions(loadedPlanned);
-        
-        const loadedCompleted = JSON.parse(localStorage.getItem('completedSessions')) || [];
-        setCompletedSessions(loadedCompleted);
+            const loadedPlanned = JSON.parse(localStorage.getItem('plannedSessions')) || [];
+            setPlannedSessions(loadedPlanned);
+            
+            const loadedCompleted = JSON.parse(localStorage.getItem('completedSessions')) || [];
+            setCompletedSessions(loadedCompleted);
+        } catch (error) {
+            console.error("Failed to load data from localStorage", error);
+        }
     }, []);
 
     useEffect(() => {
@@ -183,7 +157,7 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        if (isFocusMode && !isTimerPaused) {
+        if (isFocusMode && !isTimerPaused && currentSession) {
             timerRef.current = setInterval(() => {
                 const now = Date.now();
                 const elapsed = now - focusSessionStartTimeRef.current - totalPausedTimeRef.current;
@@ -194,6 +168,7 @@ export default function Home() {
 
                 if (actualTimeLeft <= 0) {
                     completeSession(currentSession.duration);
+                    endFocusSession();
                 }
             }, 100);
         } else {
@@ -293,11 +268,7 @@ export default function Home() {
                 return a.time.localeCompare(b.time);
             });
 
-        if (upcomingSessions.length > 0) {
-            setNextSession(upcomingSessions[0]);
-        } else {
-            setNextSession(null);
-        }
+        setNextSession(upcomingSessions[0] || null);
     };
     
     const handleAddSession = (e) => {
@@ -316,6 +287,7 @@ export default function Home() {
             return a.time.localeCompare(b.time);
         }));
         setIsModalOpen(false);
+        showToast('تمت إضافة الجلسة بنجاح.', 'success');
     };
 
     const handleDeleteSession = (sessionId) => {
@@ -350,6 +322,7 @@ export default function Home() {
     };
     
     const completeSession = (durationInMinutes) => {
+        if (!currentSession) return;
         const newCompleted = {
             id: Date.now(),
             subject: currentSession.subject,
@@ -415,7 +388,7 @@ export default function Home() {
         if (audioRef.current) {
             if (currentTrack) {
                 audioRef.current.src = currentTrack.url;
-                audioRef.current.play();
+                audioRef.current.play().catch(e => console.error("Audio play failed", e));
             } else {
                 audioRef.current.pause();
             }
