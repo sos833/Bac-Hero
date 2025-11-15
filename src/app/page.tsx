@@ -369,7 +369,7 @@ export default function Home() {
                 // Resuming
                 const pausedDuration = Date.now() - pauseStartTimeRef.current;
                 totalPausedTimeRef.current += pausedDuration;
-                if(audioRef.current) audioRef.current.play();
+                if(audioRef.current) audioRef.current.play().catch(e => console.error("Audio play failed on resume", e));
             } else {
                 // Pausing
                 pauseStartTimeRef.current = Date.now();
@@ -647,7 +647,27 @@ export default function Home() {
                             </div>
                             <div className="chart-container">
                                 <h3 className="chart-title">التقدم الأسبوعي</h3>
-                                <Bar data={weeklyChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: 'white' }, grid: { display: false } } }} />
+                                <Bar 
+                                    data={weeklyChartData} 
+                                    options={{ 
+                                        responsive: true, 
+                                        maintainAspectRatio: false, 
+                                        plugins: { 
+                                            legend: { display: false } 
+                                        }, 
+                                        scales: { 
+                                            y: { 
+                                                beginAtZero: true, 
+                                                ticks: { color: 'white' }, 
+                                                grid: { color: 'rgba(255,255,255,0.1)' } 
+                                            }, 
+                                            x: { 
+                                                ticks: { color: 'white' }, 
+                                                grid: { display: false } 
+                                            } 
+                                        } 
+                                    }} 
+                                />
                             </div>
                         </div>
                         <div className="stats-summary">
@@ -688,7 +708,6 @@ export default function Home() {
                                 <p>اختبارات من السنوات السابقة والحديثة</p>                            </div>
                             <div className="feature-card">
                                 <div className="feature-icon"><i className="fas fa-check-double"></i></div>
-                                <h3>حلول مفصلة</h3>
                                 <p>إجابات نموذجية وشروحات واضحة</p>
                             </div>
                         </div>
