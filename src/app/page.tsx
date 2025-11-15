@@ -468,7 +468,7 @@ export default function Home() {
             : 'لا توجد';
 
         setStatsSummary({
-            totalHours: (totalMinutes / 60).toFixed(1),
+            totalHours: totalMinutes / 60,
             totalSessions: completed.length,
             mostStudied
         });
@@ -662,13 +662,13 @@ export default function Home() {
                             </div>
                             <div className="chart-container">
                                 <h3 className="chart-title">التقدم الأسبوعي</h3>
-                                <Bar data={weeklyChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: 'white' }, grid: { display: false } } } }} />
+                                <Bar data={weeklyChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: 'white' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: 'white' }, grid: { display: false } } }} />
                             </div>
                         </div>
                         <div className="stats-summary">
                             <div className="summary-card">
                                 <div className="stat-icon"><i className="fas fa-graduation-cap"></i></div>
-                                <div className="stat-value">{statsSummary.totalHours}</div>
+                                <div className="stat-value">{statsSummary.totalHours.toFixed(1)}</div>
                                 <div className="stat-label">ساعة إجمالي المذاكرة</div>
                             </div>
                             <div className="summary-card">
