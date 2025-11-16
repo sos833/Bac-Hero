@@ -48,6 +48,9 @@ export default function Home() {
     const [currentSession, setCurrentSession] = useState(null);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalTasks, setModalTasks] = useState([]);
+    const [currentTask, setCurrentTask] = useState('');
+
     const [isFocusMode, setIsFocusMode] = useState(false);
     const [isStrictFocus, setIsStrictFocus] = useState(false);
     const [isTimerPaused, setIsTimerPaused] = useState(false);
@@ -95,6 +98,8 @@ export default function Home() {
         totalSessions: 0,
         mostStudied: 'لا توجد'
     });
+    const [expandedSession, setExpandedSession] = useState(null);
+
 
     // ================== Effects ==================
     useEffect(() => {
@@ -306,8 +311,18 @@ export default function Home() {
         const [hours, minutes] = time24.split(':');
         let h = parseInt(hours);
         const suffix = h >= 12 ? 'م' : 'ص';
-        h = h % 12 || 12; // convert h to 12-hour format
+        h = ((h + 11) % 12 + 1); // convert h to 12-hour format
         return `${String(h).padStart(2, '0')}:${minutes} ${suffix}`;
+    };
+
+    const handleAddTask = () => {
+        if (currentTask.trim() === '') return;
+        setModalTasks([...modalTasks, { id: Date.now(), text: currentTask, completed: false }]);
+        setCurrentTask('');
+    };
+
+    const handleRemoveTask = (taskId) => {
+        setModalTasks(modalTasks.filter(task => task.id !== taskId));
     };
 
     const handleAddSession = (e) => {
@@ -319,12 +334,14 @@ export default function Home() {
             subject: form.subject.value,
             time: form.time.value,
             duration: parseInt(form.duration.value),
+            tasks: modalTasks,
         };
         setPlannedSessions(prev => [...prev, newSession].sort((a, b) => {
             const dayCompare = daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day);
             if (dayCompare !== 0) return dayCompare;
             return a.time.localeCompare(b.time);
         }));
+        setModalTasks([]);
         setIsModalOpen(false);
         showToast('تمت إضافة الجلسة بنجاح.', 'success');
     };
@@ -337,6 +354,20 @@ export default function Home() {
                 setPlannedSessions(prev => prev.filter(s => s.id !== sessionId));
                 showToast('تم حذف الجلسة بنجاح.', 'success');
             }
+        );
+    };
+
+    const handleToggleTask = (sessionId, taskId) => {
+        setPlannedSessions(prevSessions =>
+            prevSessions.map(session => {
+                if (session.id === sessionId) {
+                    const updatedTasks = session.tasks.map(task =>
+                        task.id === taskId ? { ...task, completed: !task.completed } : task
+                    );
+                    return { ...session, tasks: updatedTasks };
+                }
+                return session;
+            })
         );
     };
 
@@ -682,18 +713,59 @@ export default function Home() {
                                     {plannedSessions
                                         .filter(s => s.day === day)
                                         .sort((a, b) => a.time.localeCompare(b.time))
-                                        .map(session => (
-                                            <div key={session.id} className="session-item">
-                                                <div className="session-details" onClick={() => selectSession(session)}>
-                                                    <div className="session-time">{formatTime12h(session.time)}</div>
-                                                    <div className="session-subject">{session.subject}</div>
-                                                    <div className="session-duration">{session.duration} دقيقة</div>
+                                        .map(session => {
+                                            const completedTasks = session.tasks?.filter(t => t.completed).length || 0;
+                                            const totalTasks = session.tasks?.length || 0;
+                                            const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+                                            return (
+                                            <div key={session.id} className={`session-item-wrapper ${expandedSession === session.id ? 'expanded' : ''}`}>
+                                                <div className="session-item" >
+                                                    <div className="session-main-info" onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}>
+                                                        <div className="session-details" >
+                                                            <div className="session-time">{formatTime12h(session.time)}</div>
+                                                            <div className="session-subject">{session.subject}</div>
+                                                            <div className="session-duration">{session.duration} دقيقة</div>
+                                                        </div>
+                                                         <div className="session-actions">
+                                                            <button className="select-session-btn" onClick={(e) => { e.stopPropagation(); selectSession(session); }} title="تحديد كجلسة تالية">
+                                                                <i className="fas fa-bullseye"></i>
+                                                            </button>
+                                                            <button className="delete-session-btn" onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}>
+                                                                <i className="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                     {totalTasks > 0 && (
+                                                        <div className="session-task-progress" onClick={() => setExpandedSession(expandedSession === session.id ? null : session.id)}>
+                                                            <div className="task-progress-bar-container">
+                                                                <div className="task-progress-bar" style={{ width: `${progress}%` }}></div>
+                                                            </div>
+                                                            <span className="task-progress-text">{completedTasks}/{totalTasks} مهام</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <button className="delete-session-btn" onClick={() => handleDeleteSession(session.id)}>
-                                                    <i className="fas fa-trash-alt"></i>
-                                                </button>
+                                                {expandedSession === session.id && (
+                                                    <div className="session-task-list">
+                                                        {session.tasks && session.tasks.length > 0 ? (
+                                                            session.tasks.map(task => (
+                                                                <div key={task.id} className="task-item">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        id={`task-${task.id}`}
+                                                                        className="task-checkbox"
+                                                                        checked={task.completed}
+                                                                        onChange={() => handleToggleTask(session.id, task.id)}
+                                                                    />
+                                                                    <label htmlFor={`task-${task.id}`}>{task.text}</label>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="no-tasks-text">لا توجد مهام لهذه الجلسة.</p>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        ))
+                                        )})
                                     }
                                 </div>
                             ))}
@@ -831,6 +903,31 @@ export default function Home() {
                                 <label className="form-label" htmlFor="session-duration">المدة (بالدقائق):</label>
                                 <input type="number" id="session-duration" name="duration" className="form-input" min="15" max="180" defaultValue="45" required />
                             </div>
+                             <div className="form-group">
+                                <label className="form-label" htmlFor="task-input">مهام الجلسة:</label>
+                                <div className="task-input-group">
+                                    <input 
+                                        type="text" 
+                                        id="task-input" 
+                                        className="form-input" 
+                                        placeholder="اكتب مهمة واضغط إضافة..." 
+                                        value={currentTask} 
+                                        onChange={(e) => setCurrentTask(e.target.value)}
+                                        onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTask(); } }}
+                                    />
+                                    <button type="button" className="add-task-btn" onClick={handleAddTask}>
+                                        <i className="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                                <div className="modal-task-list">
+                                    {modalTasks.map(task => (
+                                        <div key={task.id} className="modal-task-item">
+                                            <span>{task.text}</span>
+                                            <button type="button" onClick={() => handleRemoveTask(task.id)}>&times;</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                             <button type="submit" className="save-btn">
                                 <i className="fas fa-save"></i> حفظ الجلسة
                             </button>
@@ -841,35 +938,62 @@ export default function Home() {
             
              {isFocusMode && (
                 <div id="focus-mode" className="active">
-                    <div className="music-player-container">
-                        <button className="music-btn" onClick={() => setIsMusicListOpen(!isMusicListOpen)}>
-                            <i className="fas fa-music"></i>
-                        </button>
-                        {isMusicListOpen && (
-                            <ul className="music-list">
-                                {musicTracks.map(track => (
-                                    <li key={track.name} onClick={() => playTrack(track)}>
-                                        <i className="fas fa-play-circle"></i>
-                                        <span>{track.name}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                     <div className="focus-left-panel">
+                        <div className="music-player-container">
+                            <button className="music-btn" onClick={() => setIsMusicListOpen(!isMusicListOpen)}>
+                                <i className="fas fa-music"></i>
+                            </button>
+                            {isMusicListOpen && (
+                                <ul className="music-list">
+                                    {musicTracks.map(track => (
+                                        <li key={track.name} onClick={() => playTrack(track)}>
+                                            <i className="fas fa-play-circle"></i>
+                                            <span>{track.name}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <div className="focus-tasks-container">
+                             <h3 className="focus-tasks-title">مهام هذه الجلسة</h3>
+                            <div className="focus-task-list">
+                                {currentSession?.tasks && currentSession.tasks.length > 0 ? (
+                                    currentSession.tasks.map(task => (
+                                        <div key={task.id} className="task-item">
+                                            <input
+                                                type="checkbox"
+                                                id={`focus-task-${task.id}`}
+                                                className="task-checkbox"
+                                                checked={task.completed}
+                                                onChange={() => handleToggleTask(currentSession.id, task.id)}
+                                            />
+                                            <label htmlFor={`focus-task-${task.id}`}>{task.text}</label>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="no-tasks-text">لا توجد مهام محددة.</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="timer-subject">{currentSession?.subject}</div>
-                    <div className="timer-display">{`${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`}</div>
-                    <div className="timer-controls">
-                         <button className={`timer-btn lock-btn ${isStrictFocus ? 'active' : ''}`} onClick={toggleStrictFocus} title={isStrictFocus ? 'إلغاء قفل التركيز' : 'تفعيل قفل التركيز'}>
-                            <i className={`fas ${isStrictFocus ? 'fa-lock' : 'fa-lock-open'}`}></i>
-                        </button>
-                        <button className="timer-btn pause-btn" onClick={togglePauseTimer}>
-                            <i className={`fas ${isTimerPaused ? 'fa-play' : 'fa-pause'}`}></i> {isTimerPaused ? 'استئناف' : 'إيقاف مؤقت'}
-                        </button>
-                        <button className="timer-btn stop-btn" onClick={stopTimer}>
-                            <i className="fas fa-stop"></i> إنهاء الجلسة
-                        </button>
+
+                    <div className="focus-main-panel">
+                        <div className="timer-subject">{currentSession?.subject}</div>
+                        <div className="timer-display">{`${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`}</div>
+                        <div className="timer-controls">
+                            <button className={`timer-btn lock-btn ${isStrictFocus ? 'active' : ''}`} onClick={toggleStrictFocus} title={isStrictFocus ? 'إلغاء قفل التركيز' : 'تفعيل قفل التركيز'}>
+                                <i className={`fas ${isStrictFocus ? 'fa-lock' : 'fa-lock-open'}`}></i>
+                            </button>
+                            <button className="timer-btn pause-btn" onClick={togglePauseTimer}>
+                                <i className={`fas ${isTimerPaused ? 'fa-play' : 'fa-pause'}`}></i> {isTimerPaused ? 'استئناف' : 'إيقاف مؤقت'}
+                            </button>
+                            <button className="timer-btn stop-btn" onClick={stopTimer}>
+                                <i className="fas fa-stop"></i> إنهاء الجلسة
+                            </button>
+                        </div>
                     </div>
+                   
 
                     {currentTrack && (
                         <div className="audio-player-wrapper">
@@ -898,4 +1022,3 @@ export default function Home() {
         </>
     );
 }
-    
