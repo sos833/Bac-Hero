@@ -48,6 +48,7 @@ export default function Home() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFocusMode, setIsFocusMode] = useState(false);
+    const [isStrictFocus, setIsStrictFocus] = useState(false);
     const [isTimerPaused, setIsTimerPaused] = useState(false);
     const [timeLeft, setTimeLeft] = useState(0);
 
@@ -176,6 +177,34 @@ export default function Home() {
         }
         return () => clearInterval(timerRef.current);
     }, [isFocusMode, isTimerPaused, currentSession]);
+
+     useEffect(() => {
+        const handleBeforeUnload = (event) => {
+            if (isFocusMode && isStrictFocus) {
+                event.preventDefault();
+                event.returnValue = 'هل أنت متأكد من رغبتك في المغادرة؟ سيتم إنهاء جلسة التركيز.';
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (isFocusMode && isStrictFocus && document.hidden) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
+                showToast('التركيز أولاً! تم منع تبديل التبويب.', 'error');
+            }
+        };
+
+        if (isFocusMode && isStrictFocus) {
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isFocusMode, isStrictFocus]);
 
     const sendNotification = (title, body) => {
         if ('Notification' in window && Notification.permission === 'granted') {
@@ -337,6 +366,12 @@ export default function Home() {
     const endFocusSession = () => {
         clearInterval(timerRef.current);
         setIsFocusMode(false);
+        if (isStrictFocus) {
+            setIsStrictFocus(false);
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        }
         setCurrentSession(null);
         if (audioRef.current) {
             audioRef.current.pause();
@@ -376,6 +411,25 @@ export default function Home() {
                 if(audioRef.current) audioRef.current.pause();
             }
             return !paused;
+        });
+    };
+    
+    const toggleStrictFocus = () => {
+        setIsStrictFocus(isStrict => {
+            const newStrictState = !isStrict;
+            if (newStrictState) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                    showToast('لم يتمكن المتصفح من الدخول في وضع ملء الشاشة.', 'error');
+                });
+                showToast('تم تفعيل قفل التركيز.', 'info');
+            } else {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                }
+                showToast('تم إلغاء تفعيل قفل التركيز.', 'info');
+            }
+            return newStrictState;
         });
     };
 
@@ -795,6 +849,9 @@ export default function Home() {
                     <div className="timer-subject">{currentSession?.subject}</div>
                     <div className="timer-display">{`${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`}</div>
                     <div className="timer-controls">
+                         <button className={`timer-btn lock-btn ${isStrictFocus ? 'active' : ''}`} onClick={toggleStrictFocus} title={isStrictFocus ? 'إلغاء قفل التركيز' : 'تفعيل قفل التركيز'}>
+                            <i className={`fas ${isStrictFocus ? 'fa-lock-open' : 'fa-lock'}`}></i>
+                        </button>
                         <button className="timer-btn pause-btn" onClick={togglePauseTimer}>
                             <i className={`fas ${isTimerPaused ? 'fa-play' : 'fa-pause'}`}></i> {isTimerPaused ? 'استئناف' : 'إيقاف مؤقت'}
                         </button>
@@ -830,3 +887,4 @@ export default function Home() {
         </>
     );
 }
+    

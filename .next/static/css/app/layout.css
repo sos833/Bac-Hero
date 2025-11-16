@@ -822,6 +822,21 @@ body {
 .stop-btn:hover { background: #ff6b6b; border-color: #ff6b6b; box-shadow: 0 0 20px #ff6b6b; }
 .timer-btn:hover { transform: scale(1.05); }
 
+.lock-btn {
+    padding: 15px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+}
+
+.lock-btn.active {
+    background: var(--primary-glow);
+    border-color: var(--primary-glow);
+    color: white;
+    box-shadow: 0 0 20px var(--primary-glow);
+}
+
+
 /* Music Player */
 .music-player-container {
     position: absolute;
@@ -1144,3 +1159,4 @@ body {
     .access-content { justify-content: center; text-align: center; }
 }
 
+    
