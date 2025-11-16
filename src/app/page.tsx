@@ -304,10 +304,10 @@ export default function Home() {
     const formatTime12h = (time24) => {
         if (!time24) return '';
         const [hours, minutes] = time24.split(':');
-        const h = parseInt(hours);
+        let h = parseInt(hours);
         const suffix = h >= 12 ? 'م' : 'ص';
-        const h12 = ((h + 11) % 12 + 1);
-        return `${h12}:${minutes} ${suffix}`;
+        h = h % 12 || 12; // convert h to 12-hour format
+        return `${String(h).padStart(2, '0')}:${minutes} ${suffix}`;
     };
 
     const handleAddSession = (e) => {
