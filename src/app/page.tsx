@@ -23,6 +23,7 @@ const daysOfWeek = ['السبت', 'الأحد', 'الإثنين', 'الثلاث�
 const dayMap = { 'Sunday': 'الأحد', 'Monday': 'الإثنين', 'Tuesday': 'الثلاثاء', 'Wednesday': 'الأربعاء', 'Thursday': 'الخميس', 'Friday': 'الجمعة', 'Saturday': 'السبت' };
 
 const musicTracks = [
+    { name: 'Inspiring Cinematic', url: 'https://assets.mixkit.co/music/292/292.mp3' },
     { name: 'As The Light Fades', url: 'https://cdn.pixabay.com/audio/2023/11/13/audio_133d124575.mp3' },
     { name: 'Apathy (Slowed)', url: 'https://cdn.pixabay.com/audio/2024/05/13/audio_7cc1e69569.mp3' },
     { name: 'Watching the Stars', url: 'https://cdn.pixabay.com/audio/2024/01/06/audio_63b66c2c72.mp3' },
@@ -300,6 +301,15 @@ export default function Home() {
         setNextSession(upcomingSessions[0] || null);
     };
     
+    const formatTime12h = (time24) => {
+        if (!time24) return '';
+        const [hours, minutes] = time24.split(':');
+        const h = parseInt(hours);
+        const suffix = h >= 12 ? 'م' : 'ص';
+        const h12 = ((h + 11) % 12 + 1);
+        return `${h12}:${minutes} ${suffix}`;
+    };
+
     const handleAddSession = (e) => {
         e.preventDefault();
         const form = e.target;
@@ -641,8 +651,8 @@ export default function Home() {
                         <div className="quick-start">
                             <h3>البدء السريع</h3>
                             <div className="next-session">
-                                {currentSession ? <span>المحددة: <strong>{currentSession.subject}</strong> - {currentSession.time} ({currentSession.duration} دقيقة)</span> :
-                                 nextSession ? <span>التالية: <strong>{nextSession.subject}</strong> - {nextSession.time} ({nextSession.duration} دقيقة)</span> : 'لا توجد جلسات مجدولة'}
+                                {currentSession ? <span>المحددة: <strong>{currentSession.subject}</strong> - {formatTime12h(currentSession.time)} ({currentSession.duration} دقيقة)</span> :
+                                 nextSession ? <span>التالية: <strong>{nextSession.subject}</strong> - {formatTime12h(nextSession.time)} ({nextSession.duration} دقيقة)</span> : 'لا توجد جلسات مجدولة'}
                             </div>
                             <div className="settings-card">
                                 <div className="checkbox-container">
@@ -675,7 +685,7 @@ export default function Home() {
                                         .map(session => (
                                             <div key={session.id} className="session-item">
                                                 <div className="session-details" onClick={() => selectSession(session)}>
-                                                    <div className="session-time">{session.time}</div>
+                                                    <div className="session-time">{formatTime12h(session.time)}</div>
                                                     <div className="session-subject">{session.subject}</div>
                                                     <div className="session-duration">{session.duration} دقيقة</div>
                                                 </div>
@@ -762,6 +772,7 @@ export default function Home() {
                                 <p>اختبارات من السنوات السابقة والحديثة</p>                            </div>
                             <div className="feature-card">
                                 <div className="feature-icon"><i className="fas fa-check-double"></i></div>
+                                <h3>الحلول النموذجية</h3>
                                 <p>إجابات نموذجية وشروحات واضحة</p>
                             </div>
                         </div>
@@ -850,7 +861,7 @@ export default function Home() {
                     <div className="timer-display">{`${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`}</div>
                     <div className="timer-controls">
                          <button className={`timer-btn lock-btn ${isStrictFocus ? 'active' : ''}`} onClick={toggleStrictFocus} title={isStrictFocus ? 'إلغاء قفل التركيز' : 'تفعيل قفل التركيز'}>
-                            <i className={`fas ${isStrictFocus ? 'fa-lock-open' : 'fa-lock'}`}></i>
+                            <i className={`fas ${isStrictFocus ? 'fa-lock' : 'fa-lock-open'}`}></i>
                         </button>
                         <button className="timer-btn pause-btn" onClick={togglePauseTimer}>
                             <i className={`fas ${isTimerPaused ? 'fa-play' : 'fa-pause'}`}></i> {isTimerPaused ? 'استئناف' : 'إيقاف مؤقت'}
