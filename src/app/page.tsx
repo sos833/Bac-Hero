@@ -953,8 +953,8 @@ export default function Home() {
                                 <div className="access-content" style={{justifyContent: 'center', textAlign: 'center'}}>
                                     <div className="access-text">
                                         <h3>الخطوة 2: شارك الرمز</h3>
-                                        <p>هذا هو رمز الدخول الخاص بأهلك. يمكنهم استخدامه للدخول إلى لوحة المتابعة من الرابط:</p>
-                                        <a href="/parent" target="_blank" style={{color: 'var(--secondary-glow)', display: 'block', margin: '10px 0'}}>/parent</a>
+                                        <p>هذا هو رمز الدخول الخاص بأهلك. يمكنهم استخدامه للدخول إلى لوحة المتابعة من الرابط التالي:</p>
+                                        <a href="/parent" target="_blank" style={{color: 'var(--secondary-glow)', display: 'block', margin: '10px 0', fontSize: '1.2rem', fontWeight: 'bold'}}>/parent</a>
                                         <div style={{
                                             background: 'rgba(0,0,0,0.3)', 
                                             padding: '20px', 
@@ -968,7 +968,9 @@ export default function Home() {
                                                 fontWeight: 'bold', 
                                                 letterSpacing: '10px', 
                                                 color: 'white',
-                                                fontFamily: 'monospace'
+                                                fontFamily: 'monospace',
+                                                direction: 'ltr',
+                                                padding: '0 10px'
                                             }}>{parentalCode || '...'}</div>
                                         </div>
                                          <button className="start-btn" style={{padding: '12px 25px', fontSize: '16px', marginTop: '25px'}} onClick={generateParentalCode}>
