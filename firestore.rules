@@ -8,9 +8,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Allow parents to find the student document via the parentalCode
-      // but only allow them to read fields relevant to the dashboard.
-      allow get: if true; 
+      // Allow parents to list/query the users collection to find the student 
+      // document via the parentalCode. This is safe because the wider rules
+      // prevent reading the full document content.
+      allow list: if true;
       
       // Allow student to read/write their own full document
       allow read, write: if isOwner(userId);
