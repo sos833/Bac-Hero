@@ -8,13 +8,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Allow parents to list/query the users collection to find the student 
-      // document via the parentalCode. This is safe because the wider rules
-      // prevent reading the full document content.
-      allow list: if true;
+      // Allow parents to list/query to find the student doc via parentalCode,
+      // and get the document once found. This is safe because sensitive data
+      // is not in the top-level user document.
+      allow list, get: if true;
       
-      // Allow student to read/write their own full document
-      allow read, write: if isOwner(userId);
+      // Allow student to write their own full document
+      allow write: if isOwner(userId);
 
       match /plannedSessions/{sessionId} {
         allow read, write, delete: if isOwner(userId);
