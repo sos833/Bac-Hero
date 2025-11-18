@@ -11,6 +11,10 @@
                 "shutdownFeature": {
                     "type": "boolean",
                     "description": "Whether the shutdown feature is enabled."
+                },
+                "parentalCode": {
+                    "type": "string",
+                    "description": "A 4-character code for parental monitoring."
                 }
             }
         },
@@ -33,7 +37,7 @@
             "title": "Completed Session",
             "type": "object",
             "properties": {
-                "subject": { "type": "string" },
+                "subject": { "type": "string" },-
                 "duration": { "type": "number" },
                 "date": { "type": "string", "format": "date-time" }
             },
@@ -51,7 +55,7 @@
         }
     },
     "auth": {
-        "providers": ["anonymous"]
+        "providers": ["anonymous", "google.com"]
     },
     "firestore": {
         "/users/{userId}": {

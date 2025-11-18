@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { useUser, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useFirebase, useMemoFirebase, useCollection, useDoc } from '@/firebase';
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
-import { collection, doc, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, deleteDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement);
 
@@ -40,8 +41,14 @@ export default function Home() {
     const [activeSection, setActiveSection] = useState('dashboard');
     const [motivationalQuote, setMotivationalQuote] = useState(quotes[0]);
     const [liveClock, setLiveClock] = useState('');
+    
+    // User settings states
+    const userSettingsRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+    const { data: userSettings } = useDoc(userSettingsRef);
+
     const [dailyGoal, setDailyGoal] = useState(180);
     const [shutdownFeature, setShutdownFeature] = useState(false);
+    const [parentalCode, setParentalCode] = useState('');
         
     const [todayStudyTime, setTodayStudyTime] = useState(0);
     const [todayCompletedSessions, setTodayCompletedSessions] = useState(0);
@@ -79,7 +86,6 @@ export default function Home() {
     // Firestore collections refs
     const plannedSessionsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'plannedSessions') : null, [firestore, user]);
     const completedSessionsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'completedSessions') : null, [firestore, user]);
-    const settingsRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
 
     const { data: plannedSessions } = useCollection(plannedSessionsRef);
     const { data: completedSessions } = useCollection(completedSessionsRef);
@@ -119,6 +125,26 @@ export default function Home() {
         }
     }, [isUserLoading, user, auth]);
 
+    // Load user settings from Firestore
+    useEffect(() => {
+        if (userSettings) {
+            setDailyGoal(userSettings.dailyGoal || 180);
+            setShutdownFeature(userSettings.shutdownFeature || false);
+            setParentalCode(userSettings.parentalCode || '');
+        }
+    }, [userSettings]);
+
+    // Save user settings to Firestore
+    const handleDailyGoalChange = (newGoal) => {
+        setDailyGoal(newGoal);
+        if(userSettingsRef) setDocumentNonBlocking(userSettingsRef, { dailyGoal: newGoal }, { merge: true });
+    };
+
+    const handleShutdownFeatureChange = (enabled) => {
+        setShutdownFeature(enabled);
+        if(userSettingsRef) setDocumentNonBlocking(userSettingsRef, { shutdownFeature: enabled }, { merge: true });
+    };
+
     useEffect(() => {
         const interval = setInterval(() => {
             setMotivationalQuote(quotes[Math.floor(Math.random() * quotes.length)]);
@@ -138,27 +164,17 @@ export default function Home() {
     }, [plannedSessions]);
     
     useEffect(() => {
-        if (user && settingsRef) {
-            setDocumentNonBlocking(settingsRef, { dailyGoal, shutdownFeature }, { merge: true });
-        }
         updateDashboardStats();
-    }, [dailyGoal, shutdownFeature, completedSessions, user, settingsRef]);
+    }, [dailyGoal, completedSessions]);
 
     useEffect(() => {
         updateNextSessionInternal();
     }, [plannedSessions]);
 
     useEffect(() => {
-        updateDashboardStats();
         updateAnalytics();
     }, [completedSessions]);
     
-    useEffect(() => {
-        updateDashboardStats();
-        updateAnalytics();
-        updateNextSessionInternal();
-    }, [plannedSessions, completedSessions]);
-
     useEffect(() => {
         if (isFocusMode && !isTimerPaused && currentSession) {
             timerRef.current = setInterval(() => {
@@ -265,7 +281,13 @@ export default function Home() {
     };
     
     const updateDashboardStats = () => {
-        if (!completedSessions) return;
+        if (!completedSessions) {
+            setTodayStudyTime(0);
+            setTodayCompletedSessions(0);
+            setDailyProgress(0);
+            setProgressText(`0 / ${dailyGoal} دقيقة (0%)`);
+            return;
+        }
         const today = new Date().toDateString();
         const todaySessions = completedSessions.filter(s => new Date(s.date).toDateString() === today);
         const totalMinutesToday = todaySessions.reduce((sum, s) => sum + s.duration, 0);
@@ -315,7 +337,7 @@ export default function Home() {
 
     const handleAddTask = () => {
         if (currentTask.trim() === '') return;
-        setModalTasks([...modalTasks, { id: Date.now(), text: currentTask, completed: false }]);
+        setModalTasks([...modalTasks, { id: Date.now().toString(), text: currentTask, completed: false }]);
         setCurrentTask('');
     };
 
@@ -359,7 +381,7 @@ export default function Home() {
         if (!session) return;
 
         const updatedTasks = session.tasks.map(task =>
-            task.id === taskId ? { ...task, completed: !isCompleted } : task
+            task.id.toString() === taskId.toString() ? { ...task, completed: !isCompleted } : task
         );
         
         const sessionDocRef = doc(firestore, 'users', user.uid, 'plannedSessions', sessionId);
@@ -582,13 +604,38 @@ export default function Home() {
             );
         }
     };
+
+    const handleGoogleSignIn = () => {
+        const provider = new GoogleAuthProvider();
+        signInWithPopup(auth, provider)
+            .then((result) => {
+                showToast('تم تسجيل الدخول بنجاح!', 'success');
+                if (!parentalCode) {
+                    generateParentalCode();
+                }
+            }).catch((error) => {
+                console.error("Authentication error:", error);
+                showToast('حدث خطأ أثناء تسجيل الدخول.', 'error');
+            });
+    };
+
+    const generateParentalCode = () => {
+        if (!userSettingsRef) return;
+        const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+        setDocumentNonBlocking(userSettingsRef, { parentalCode: code }, { merge: true });
+        setParentalCode(code);
+        showToast('تم إنشاء رمز المراقبة الأبوية الجديد.', 'info');
+    };
     
     if (isUserLoading) {
-        return <div className="loading-screen">
+        return <div style={{
+            display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh',
+            background: 'linear-gradient(135deg, #0d0f2b 0%, #0a0b1e 100%)', color: 'white', flexDirection: 'column', fontFamily: 'Segoe UI'
+        }}>
             <div className="logo">
-                <i className="fas fa-brain logo-icon"></i>
-                <h1>Bac Hero</h1>
-                <p>...جاري التحميل</p>
+                <i className="fas fa-brain logo-icon" style={{fontSize: '4rem', marginBottom: '1rem'}}></i>
+                <h1 style={{fontSize: '2.5rem', fontWeight: 'bold'}}>Bac Hero</h1>
+                <p style={{fontSize: '1.2rem', marginTop: '0.5rem'}}>...جاري التحميل</p>
             </div>
         </div>
     }
@@ -633,9 +680,15 @@ export default function Home() {
                             <span>بنك الاختبارات</span>
                         </a>
                     </li>
+                    <li className="nav-item">
+                        <a href="#" className={`nav-link ${activeSection === 'parental' ? 'active' : ''}`} onClick={() => setActiveSection('parental')}>
+                            <i className="fas fa-user-shield"></i>
+                            <span>المراقبة الأبوية</span>
+                        </a>
+                    </li>
                 </ul>
                 <div className="sidebar-footer">
-                    <p>v2.0.0 - Cloud</p>
+                    <p>v2.1.0 - Cloud</p>
                 </div>
             </div>
 
@@ -672,7 +725,7 @@ export default function Home() {
                                 <h3 className="progress-title">تقدم الهدف اليومي</h3>
                                 <div className="goal-setter">
                                     <span>الهدف:</span>
-                                    <input type="number" className="goal-input" value={dailyGoal} onChange={e => setDailyGoal(parseInt(e.target.value) || 0)} min="0" max="600" />
+                                    <input type="number" className="goal-input" value={dailyGoal} onChange={e => handleDailyGoalChange(parseInt(e.target.value) || 0)} min="0" max="600" />
                                     <span>دقيقة</span>
                                 </div>
                             </div>
@@ -690,7 +743,7 @@ export default function Home() {
                             </div>
                             <div className="settings-card">
                                 <div className="checkbox-container">
-                                    <input type="checkbox" id="shutdown-feature" className="checkbox" checked={shutdownFeature} onChange={e => setShutdownFeature(e.target.checked)} />
+                                    <input type="checkbox" id="shutdown-feature" className="checkbox" checked={shutdownFeature} onChange={e => handleShutdownFeatureChange(e.target.checked)} />
                                     <label htmlFor="shutdown-feature">تفعيل وضع الإغلاق بعد انتهاء الجلسة (قريباً)</label>
                                 </div>
                             </div>
@@ -875,6 +928,55 @@ export default function Home() {
                                 <div className="subject-item" onClick={() => openSubjectExams('languages')}><i className="fas fa-language"></i><span>اللغات الأجنبية</span></div>
                                 <div className="subject-item" onClick={() => openSubjectExams('philosophy')}><i className="fas fa-brain"></i><span>الفلسفة</span></div>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                 {activeSection === 'parental' && (
+                     <div id="parental" className="section active">
+                        <h2 className="section-title">المراقبة الأبوية</h2>
+                        <p style={{textAlign: 'center', marginBottom: '40px', color: 'var(--text-secondary)'}}>
+                            شارك تقدمك مع أهلك لتبقى متحفزاً.
+                        </p>
+                        <div className="access-card">
+                             {!user || user.isAnonymous ? (
+                                <div className="access-content" style={{justifyContent: 'center', textAlign: 'center'}}>
+                                    <div className="access-text">
+                                        <h3>الخطوة 1: ربط حسابك</h3>
+                                        <p>لتفعيل المراقبة الأبوية، يرجى تسجيل الدخول بحساب Google أولاً. هذا يساعد على حفظ بياناتك بأمان.</p>
+                                        <button className="access-btn" style={{marginTop: '20px'}} onClick={handleGoogleSignIn}>
+                                            <i className="fab fa-google" style={{marginLeft: '10px'}}></i> تسجيل الدخول بـ Google
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="access-content" style={{justifyContent: 'center', textAlign: 'center'}}>
+                                    <div className="access-text">
+                                        <h3>الخطوة 2: شارك الرمز</h3>
+                                        <p>هذا هو رمز الدخول الخاص بأهلك. يمكنهم استخدامه للدخول إلى لوحة المتابعة من الرابط:</p>
+                                        <a href="/parent" target="_blank" style={{color: 'var(--secondary-glow)', display: 'block', margin: '10px 0'}}>/parent</a>
+                                        <div style={{
+                                            background: 'rgba(0,0,0,0.3)', 
+                                            padding: '20px', 
+                                            borderRadius: '15px', 
+                                            marginTop: '20px',
+                                            border: '1px solid var(--card-border)'
+                                        }}>
+                                            <p style={{margin: '0 0 10px 0', fontSize: '16px'}}>رمز الدخول الخاص بك:</p>
+                                            <div style={{
+                                                fontSize: '48px', 
+                                                fontWeight: 'bold', 
+                                                letterSpacing: '10px', 
+                                                color: 'white',
+                                                fontFamily: 'monospace'
+                                            }}>{parentalCode || '...'}</div>
+                                        </div>
+                                         <button className="start-btn" style={{padding: '12px 25px', fontSize: '16px', marginTop: '25px'}} onClick={generateParentalCode}>
+                                            <i className="fas fa-sync-alt" style={{marginLeft: '8px'}}></i> إنشاء رمز جديد
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
