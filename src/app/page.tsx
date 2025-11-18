@@ -263,7 +263,7 @@ export default function Home() {
         setToasts(prev => [...prev, { id, message, type }]);
         setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== id));
-        }, 3000);
+        }, 5000);
     };
 
     const openConfirmModal = (title, message, onConfirm) => {
@@ -610,20 +610,23 @@ export default function Home() {
         signInWithPopup(auth, provider)
             .then((result) => {
                 showToast('تم تسجيل الدخول بنجاح!', 'success');
-                // The user object might not be immediately available in the `user` state from the hook,
-                // so we use the result from the popup.
                 const loggedInUser = result.user;
+                // Check if a code already exists for this user in Firestore first.
+                // We are already doing this via the `parentalCode` state which is fed by the `userSettings` doc.
                 if (!parentalCode) {
                     generateParentalCode(loggedInUser.uid);
                 }
             }).catch((error) => {
-                console.error("Authentication error:", error);
-                showToast('حدث خطأ أثناء تسجيل الدخول.', 'error');
+                console.error("Authentication error:", error.code, error.message);
+                if (error.code === 'auth/operation-not-allowed') {
+                    showToast('خطأ: لم يتم تفعيل تسجيل الدخول بـ Google في إعدادات Firebase.', 'error');
+                } else {
+                    showToast('حدث خطأ أثناء تسجيل الدخول.', 'error');
+                }
             });
     };
 
     const generateParentalCode = (uid) => {
-        // Ensure we have a user ID to associate the code with.
         const targetUid = uid || user?.uid;
         if (!targetUid) {
             showToast('لا يمكن إنشاء الرمز بدون مستخدم مسجل الدخول.', 'error');
