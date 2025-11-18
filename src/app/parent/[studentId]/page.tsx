@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { useFirebase, useCollection, useDoc } from '@/firebase';
+import { useFirebase, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement);
@@ -12,10 +12,10 @@ export default function ParentDashboard({ params }: { params: { studentId: strin
     const { firestore } = useFirebase();
     const studentId = params.studentId;
 
-    const userSettingsRef = useMemo(() => studentId ? doc(firestore, 'users', studentId) : null, [firestore, studentId]);
+    const userSettingsRef = useMemoFirebase(() => studentId ? doc(firestore, 'users', studentId) : null, [firestore, studentId]);
     const { data: userSettings, isLoading: isUserLoading } = useDoc(userSettingsRef);
     
-    const completedSessionsRef = useMemo(() => studentId ? collection(firestore, 'users', studentId, 'completedSessions') : null, [firestore, studentId]);
+    const completedSessionsRef = useMemoFirebase(() => studentId ? collection(firestore, 'users', studentId, 'completedSessions') : null, [firestore, studentId]);
     const { data: completedSessions, isLoading: isSessionsLoading } = useCollection(completedSessionsRef);
 
     const [subjectChartData, setSubjectChartData] = useState({
