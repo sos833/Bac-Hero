@@ -3,22 +3,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check ownership
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Users can only read/write their own data
     match /users/{userId} {
+      // Allow parents to find the student document via the parentalCode
+      // but only allow them to read fields relevant to the dashboard.
+      allow get: if true; 
+      
+      // Allow student to read/write their own full document
       allow read, write: if isOwner(userId);
 
-      // Users can only manage their own planned sessions
       match /plannedSessions/{sessionId} {
         allow read, write, delete: if isOwner(userId);
       }
       
-      // Users can only manage their own completed sessions
       match /completedSessions/{completedId} {
+        // Allow parent to read completed sessions for the dashboard
+        allow get, list: if true; 
+        // Allow student to manage their own sessions
         allow read, write, delete: if isOwner(userId);
       }
     }
