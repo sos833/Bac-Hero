@@ -81,8 +81,8 @@ export default function Home() {
     const completedSessionsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'completedSessions') : null, [firestore, user]);
     const settingsRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
 
-    const { data: plannedSessions = [] } = useCollection(plannedSessionsRef);
-    const { data: completedSessions = [] } = useCollection(completedSessionsRef);
+    const { data: plannedSessions } = useCollection(plannedSessionsRef);
+    const { data: completedSessions } = useCollection(completedSessionsRef);
      
     const [subjectChartData, setSubjectChartData] = useState({
         labels: ['لا توجد بيانات'],
@@ -221,6 +221,7 @@ export default function Home() {
     };
 
     const checkUpcomingSessions = (now) => {
+        if (!plannedSessions) return;
         const currentDayName = dayMap[now.toLocaleString('en-US', { weekday: 'long' })];
         const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         
@@ -264,6 +265,7 @@ export default function Home() {
     };
     
     const updateDashboardStats = () => {
+        if (!completedSessions) return;
         const today = new Date().toDateString();
         const todaySessions = completedSessions.filter(s => new Date(s.date).toDateString() === today);
         const totalMinutesToday = todaySessions.reduce((sum, s) => sum + s.duration, 0);
@@ -279,6 +281,7 @@ export default function Home() {
     };
 
     const updateNextSessionInternal = () => {
+        if (!plannedSessions) return;
         const now = new Date();
         const currentDayName = dayMap[now.toLocaleString('en-US', { weekday: 'long' })];
         const currentTime = now.getHours() * 60 + now.getMinutes();
@@ -351,7 +354,7 @@ export default function Home() {
     };
 
     const handleToggleTask = (sessionId, taskId, isCompleted) => {
-        if (!user) return;
+        if (!user || !plannedSessions) return;
         const session = plannedSessions.find(s => s.id === sessionId);
         if (!session) return;
 
@@ -710,7 +713,7 @@ export default function Home() {
                             {daysOfWeek.map(day => (
                                 <div key={day} className="day-column">
                                     <div className="day-header">{day}</div>
-                                    {plannedSessions
+                                    {plannedSessions && plannedSessions
                                         .filter(s => s.day === day)
                                         .sort((a, b) => a.time.localeCompare(b.time))
                                         .map(session => {
