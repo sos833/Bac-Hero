@@ -327,12 +327,12 @@ export default function Home() {
     };
     
     const formatTime12h = (time24) => {
-      if (!time24) return '';
-      const [hours, minutes] = time24.split(':');
-      let h = parseInt(hours, 10);
-      const suffix = h >= 12 ? 'م' : 'ص';
-      h = ((h + 11) % 12 + 1);
-      return `${String(h).padStart(2, '0')}:${minutes} ${suffix}`;
+        if (!time24) return '';
+        const [hours, minutes] = time24.split(':');
+        let h = parseInt(hours, 10);
+        const suffix = h >= 12 ? 'م' : 'ص';
+        h = h % 12 || 12; // Convert 0 to 12
+        return `${String(h).padStart(2, '0')}:${minutes} ${suffix}`;
     };
 
     const handleAddTask = () => {
@@ -610,8 +610,11 @@ export default function Home() {
         signInWithPopup(auth, provider)
             .then((result) => {
                 showToast('تم تسجيل الدخول بنجاح!', 'success');
+                // The user object might not be immediately available in the `user` state from the hook,
+                // so we use the result from the popup.
+                const loggedInUser = result.user;
                 if (!parentalCode) {
-                    generateParentalCode();
+                    generateParentalCode(loggedInUser.uid);
                 }
             }).catch((error) => {
                 console.error("Authentication error:", error);
@@ -619,10 +622,16 @@ export default function Home() {
             });
     };
 
-    const generateParentalCode = () => {
-        if (!userSettingsRef) return;
+    const generateParentalCode = (uid) => {
+        // Ensure we have a user ID to associate the code with.
+        const targetUid = uid || user?.uid;
+        if (!targetUid) {
+            showToast('لا يمكن إنشاء الرمز بدون مستخدم مسجل الدخول.', 'error');
+            return;
+        }
+        const userRef = doc(firestore, 'users', targetUid);
         const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        setDocumentNonBlocking(userSettingsRef, { parentalCode: code }, { merge: true });
+        setDocumentNonBlocking(userRef, { parentalCode: code }, { merge: true });
         setParentalCode(code);
         showToast('تم إنشاء رمز المراقبة الأبوية الجديد.', 'info');
     };
@@ -973,7 +982,7 @@ export default function Home() {
                                                 padding: '0 10px'
                                             }}>{parentalCode || '...'}</div>
                                         </div>
-                                         <button className="start-btn" style={{padding: '12px 25px', fontSize: '16px', marginTop: '25px'}} onClick={generateParentalCode}>
+                                         <button className="start-btn" style={{padding: '12px 25px', fontSize: '16px', marginTop: '25px'}} onClick={() => generateParentalCode(user.uid)}>
                                             <i className="fas fa-sync-alt" style={{marginLeft: '8px'}}></i> إنشاء رمز جديد
                                         </button>
                                     </div>
