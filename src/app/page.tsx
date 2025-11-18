@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import { useUser, useFirebase, useMemoFirebase, useCollection } from '@/firebase';
+import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
+import { collection, doc, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement);
 
@@ -30,15 +34,15 @@ const musicTracks = [
 ];
 
 export default function Home() {
+    const { auth, firestore } = useFirebase();
+    const { user, isUserLoading } = useUser();
+
     const [activeSection, setActiveSection] = useState('dashboard');
     const [motivationalQuote, setMotivationalQuote] = useState(quotes[0]);
     const [liveClock, setLiveClock] = useState('');
     const [dailyGoal, setDailyGoal] = useState(180);
     const [shutdownFeature, setShutdownFeature] = useState(false);
-    
-    const [plannedSessions, setPlannedSessions] = useState([]);
-    const [completedSessions, setCompletedSessions] = useState([]);
-    
+        
     const [todayStudyTime, setTodayStudyTime] = useState(0);
     const [todayCompletedSessions, setTodayCompletedSessions] = useState(0);
     const [dailyProgress, setDailyProgress] = useState(0);
@@ -72,6 +76,14 @@ export default function Home() {
     const pauseStartTimeRef = useRef(0);
     const totalPausedTimeRef = useRef(0);
 
+    // Firestore collections refs
+    const plannedSessionsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'plannedSessions') : null, [firestore, user]);
+    const completedSessionsRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'completedSessions') : null, [firestore, user]);
+    const settingsRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+
+    const { data: plannedSessions = [] } = useCollection(plannedSessionsRef);
+    const { data: completedSessions = [] } = useCollection(completedSessionsRef);
+     
     const [subjectChartData, setSubjectChartData] = useState({
         labels: ['لا توجد بيانات'],
         datasets: [{
@@ -100,27 +112,12 @@ export default function Home() {
     });
     const [expandedSession, setExpandedSession] = useState(null);
 
-
-    // ================== Effects ==================
+    // Sign in anonymously if not logged in
     useEffect(() => {
-        if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            Notification.requestPermission();
+        if (!isUserLoading && !user) {
+            initiateAnonymousSignIn(auth);
         }
-        
-        try {
-            const settings = JSON.parse(localStorage.getItem('bacHeroSettings')) || { dailyGoal: 180, shutdownFeature: false };
-            setDailyGoal(settings.dailyGoal);
-            setShutdownFeature(settings.shutdownFeature);
-
-            const loadedPlanned = JSON.parse(localStorage.getItem('plannedSessions')) || [];
-            setPlannedSessions(loadedPlanned);
-            
-            const loadedCompleted = JSON.parse(localStorage.getItem('completedSessions')) || [];
-            setCompletedSessions(loadedCompleted);
-        } catch (error) {
-            console.error("Failed to load data from localStorage", error);
-        }
-    }, []);
+    }, [isUserLoading, user, auth]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -141,18 +138,17 @@ export default function Home() {
     }, [plannedSessions]);
     
     useEffect(() => {
-        const settings = { dailyGoal, shutdownFeature };
-        localStorage.setItem('bacHeroSettings', JSON.stringify(settings));
+        if (user && settingsRef) {
+            setDocumentNonBlocking(settingsRef, { dailyGoal, shutdownFeature }, { merge: true });
+        }
         updateDashboardStats();
-    }, [dailyGoal, shutdownFeature, completedSessions]);
+    }, [dailyGoal, shutdownFeature, completedSessions, user, settingsRef]);
 
     useEffect(() => {
-        localStorage.setItem('plannedSessions', JSON.stringify(plannedSessions));
         updateNextSessionInternal();
     }, [plannedSessions]);
 
     useEffect(() => {
-        localStorage.setItem('completedSessions', JSON.stringify(completedSessions));
         updateDashboardStats();
         updateAnalytics();
     }, [completedSessions]);
@@ -161,7 +157,7 @@ export default function Home() {
         updateDashboardStats();
         updateAnalytics();
         updateNextSessionInternal();
-    }, []);
+    }, [plannedSessions, completedSessions]);
 
     useEffect(() => {
         if (isFocusMode && !isTimerPaused && currentSession) {
@@ -228,8 +224,7 @@ export default function Home() {
         const currentDayName = dayMap[now.toLocaleString('en-US', { weekday: 'long' })];
         const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         
-        const sessions = JSON.parse(localStorage.getItem('plannedSessions')) || [];
-        sessions.forEach(session => {
+        plannedSessions.forEach(session => {
             const notificationId = `${session.day}-${session.time}`;
             if (session.day === currentDayName && session.time === currentTime && !notifiedSessionsRef.current.has(notificationId)) {
                 sendNotification(
@@ -307,12 +302,12 @@ export default function Home() {
     };
     
     const formatTime12h = (time24) => {
-        if (!time24) return '';
-        const [hours, minutes] = time24.split(':');
-        let h = parseInt(hours);
-        const suffix = h >= 12 ? 'م' : 'ص';
-        h = ((h + 11) % 12 + 1); // convert h to 12-hour format
-        return `${String(h).padStart(2, '0')}:${minutes} ${suffix}`;
+      if (!time24) return '';
+      const [hours, minutes] = time24.split(':');
+      let h = parseInt(hours, 10);
+      const suffix = h >= 12 ? 'م' : 'ص';
+      h = ((h + 11) % 12 + 1);
+      return `${String(h).padStart(2, '0')}:${minutes} ${suffix}`;
     };
 
     const handleAddTask = () => {
@@ -327,20 +322,16 @@ export default function Home() {
 
     const handleAddSession = (e) => {
         e.preventDefault();
+        if (!plannedSessionsRef) return;
         const form = e.target;
         const newSession = {
-            id: Date.now(),
             day: form.day.value,
             subject: form.subject.value,
             time: form.time.value,
             duration: parseInt(form.duration.value),
             tasks: modalTasks,
         };
-        setPlannedSessions(prev => [...prev, newSession].sort((a, b) => {
-            const dayCompare = daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day);
-            if (dayCompare !== 0) return dayCompare;
-            return a.time.localeCompare(b.time);
-        }));
+        addDocumentNonBlocking(plannedSessionsRef, newSession);
         setModalTasks([]);
         setIsModalOpen(false);
         showToast('تمت إضافة الجلسة بنجاح.', 'success');
@@ -351,24 +342,25 @@ export default function Home() {
             'حذف الجلسة',
             'هل أنت متأكد من رغبتك في حذف هذه الجلسة؟',
             () => {
-                setPlannedSessions(prev => prev.filter(s => s.id !== sessionId));
+                if (!user) return;
+                const docRef = doc(firestore, 'users', user.uid, 'plannedSessions', sessionId);
+                deleteDocumentNonBlocking(docRef);
                 showToast('تم حذف الجلسة بنجاح.', 'success');
             }
         );
     };
 
-    const handleToggleTask = (sessionId, taskId) => {
-        setPlannedSessions(prevSessions =>
-            prevSessions.map(session => {
-                if (session.id === sessionId) {
-                    const updatedTasks = session.tasks.map(task =>
-                        task.id === taskId ? { ...task, completed: !task.completed } : task
-                    );
-                    return { ...session, tasks: updatedTasks };
-                }
-                return session;
-            })
+    const handleToggleTask = (sessionId, taskId, isCompleted) => {
+        if (!user) return;
+        const session = plannedSessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        const updatedTasks = session.tasks.map(task =>
+            task.id === taskId ? { ...task, completed: !isCompleted } : task
         );
+        
+        const sessionDocRef = doc(firestore, 'users', user.uid, 'plannedSessions', sessionId);
+        updateDocumentNonBlocking(sessionDocRef, { tasks: updatedTasks });
     };
 
     const startFocusSession = () => {
@@ -392,14 +384,13 @@ export default function Home() {
     };
     
     const completeSession = (durationInMinutes) => {
-        if (!currentSession) return;
+        if (!currentSession || !completedSessionsRef) return;
         const newCompleted = {
-            id: Date.now(),
             subject: currentSession.subject,
             duration: durationInMinutes,
             date: new Date().toISOString()
         };
-        setCompletedSessions(prev => [...prev, newCompleted]);
+        addDocumentNonBlocking(completedSessionsRef, newCompleted);
         sendNotification('أحسنت!', `أكملت ${durationInMinutes} دقيقة من مذاكرة ${currentSession.subject}.`);
         showToast(`أحسنت! تم حفظ ${durationInMinutes} دقيقة.`, 'success');
     };
@@ -497,7 +488,7 @@ export default function Home() {
     };
 
     const updateAnalytics = () => {
-        const completed = JSON.parse(localStorage.getItem('completedSessions')) || [];
+        const completed = completedSessions || [];
 
         // Subject Chart
         const subjectData = completed.reduce((acc, s) => {
@@ -589,7 +580,16 @@ export default function Home() {
         }
     };
     
-    // ================== Render ==================
+    if (isUserLoading) {
+        return <div className="loading-screen">
+            <div className="logo">
+                <i className="fas fa-brain logo-icon"></i>
+                <h1>Bac Hero</h1>
+                <p>...جاري التحميل</p>
+            </div>
+        </div>
+    }
+
     return (
         <>
              <div className="toast-container">
@@ -632,7 +632,7 @@ export default function Home() {
                     </li>
                 </ul>
                 <div className="sidebar-footer">
-                    <p>v1.2.0</p>
+                    <p>v2.0.0 - Cloud</p>
                 </div>
             </div>
 
@@ -754,7 +754,7 @@ export default function Home() {
                                                                         id={`task-${task.id}`}
                                                                         className="task-checkbox"
                                                                         checked={task.completed}
-                                                                        onChange={() => handleToggleTask(session.id, task.id)}
+                                                                        onChange={() => handleToggleTask(session.id, task.id, task.completed)}
                                                                     />
                                                                     <label htmlFor={`task-${task.id}`}>{task.text}</label>
                                                                 </div>
@@ -965,7 +965,7 @@ export default function Home() {
                                                 id={`focus-task-${task.id}`}
                                                 className="task-checkbox"
                                                 checked={task.completed}
-                                                onChange={() => handleToggleTask(currentSession.id, task.id)}
+                                                onChange={() => handleToggleTask(currentSession.id, task.id, task.completed)}
                                             />
                                             <label htmlFor={`focus-task-${task.id}`}>{task.text}</label>
                                         </div>

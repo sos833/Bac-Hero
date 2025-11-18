@@ -1,287 +1,70 @@
 {
-  "entities": {
-    "Product": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Product",
-      "type": "object",
-      "description": "Represents a coffee bean product available for sale.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the product."
+    "entities": {
+        "User": {
+            "title": "User",
+            "type": "object",
+            "properties": {
+                "dailyGoal": {
+                    "type": "number",
+                    "description": "The user's daily study goal in minutes."
+                },
+                "shutdownFeature": {
+                    "type": "boolean",
+                    "description": "Whether the shutdown feature is enabled."
+                }
+            }
         },
-        "name": {
-          "type": "string",
-          "description": "Name of the coffee bean product."
+        "PlannedSession": {
+            "title": "Planned Session",
+            "type": "object",
+            "properties": {
+                "day": { "type": "string" },
+                "subject": { "type": "string" },
+                "time": { "type": "string" },
+                "duration": { "type": "number" },
+                "tasks": {
+                    "type": "array",
+                    "items": { "$ref": "#/entities/Task" }
+                }
+            },
+            "required": ["day", "subject", "time", "duration"]
         },
-        "description": {
-          "type": "string",
-          "description": "Detailed description of the product, including flavor profile and origin."
+        "CompletedSession": {
+            "title": "Completed Session",
+            "type": "object",
+            "properties": {
+                "subject": { "type": "string" },
+                "duration": { "type": "number" },
+                "date": { "type": "string", "format": "date-time" }
+            },
+            "required": ["subject", "duration", "date"]
         },
-        "imageUrl": {
-          "type": "string",
-          "description": "URL of the product image.",
-          "format": "uri"
-        },
-        "price": {
-          "type": "number",
-          "description": "Price of the product.",
-          "format": "float"
-        },
-        "inventory": {
-          "type": "number",
-          "description": "Current inventory level of the product."
+        "Task": {
+            "title": "Task",
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "text": { "type": "string" },
+                "completed": { "type": "boolean" }
+            },
+            "required": ["id", "text", "completed"]
         }
-      },
-      "required": [
-        "id",
-        "name",
-        "description",
-        "imageUrl",
-        "price",
-        "inventory"
-      ]
     },
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
-      "type": "object",
-      "description": "Represents a user of the Bean Boutique application.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address of the user.",
-          "format": "email"
-        },
-        "firstName": {
-          "type": "string",
-          "description": "First name of the user."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "Last name of the user."
-        }
-      },
-      "required": [
-        "id",
-        "email",
-        "firstName",
-        "lastName"
-      ]
+    "auth": {
+        "providers": ["anonymous"]
     },
-    "Order": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Order",
-      "type": "object",
-      "description": "Represents an order placed by a user.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the order."
+    "firestore": {
+        "/users/{userId}": {
+            "schema": "User",
+            "description": "Stores user-specific settings."
         },
-        "userId": {
-          "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N Order)"
+        "/users/{userId}/plannedSessions/{sessionId}": {
+            "schema": "PlannedSession",
+            "description": "Stores the user's planned study sessions."
         },
-        "orderDate": {
-          "type": "string",
-          "description": "Date and time the order was placed.",
-          "format": "date-time"
-        },
-        "totalAmount": {
-          "type": "number",
-          "description": "Total amount of the order.",
-          "format": "float"
-        },
-        "status": {
-          "type": "string",
-          "description": "Current status of the order (e.g., 'Pending', 'Shipped', 'Delivered')."
+        "/users/{userId}/completedSessions/{completedId}": {
+            "schema": "CompletedSession",
+            "description": "Stores the user's completed study sessions."
         }
-      },
-      "required": [
-        "id",
-        "userId",
-        "orderDate",
-        "totalAmount",
-        "status"
-      ]
-    },
-    "OrderItem": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "OrderItem",
-      "type": "object",
-      "description": "Represents an item within an order.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the order item."
-        },
-        "orderId": {
-          "type": "string",
-          "description": "Reference to Order. (Relationship: Order 1:N OrderItem)"
-        },
-        "productId": {
-          "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N OrderItem)"
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Quantity of the product in the order item."
-        },
-        "price": {
-          "type": "number",
-          "description": "Price of the product at the time of the order.",
-          "format": "float"
-        }
-      },
-      "required": [
-        "id",
-        "orderId",
-        "productId",
-        "quantity",
-        "price"
-      ]
-    },
-    "Recommendation": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Recommendation",
-      "type": "object",
-      "description": "Represents a product recommendation for a user.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the recommendation."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N Recommendation)"
-        },
-        "productId": {
-          "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N Recommendation)"
-        },
-        "reason": {
-          "type": "string",
-          "description": "Reason for the product recommendation."
-        }
-      },
-      "required": [
-        "id",
-        "userId",
-        "productId",
-        "reason"
-      ]
     }
-  },
-  "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
-  },
-  "firestore": {
-    "structure": [
-      {
-        "path": "/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": {
-            "$ref": "#/backend/entities/Product"
-          },
-          "description": "Stores coffee bean product information.",
-          "params": [
-            {
-              "name": "productId",
-              "description": "Unique identifier for the product."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profile information.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "Unique identifier for the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/orders/{orderId}",
-        "definition": {
-          "entityName": "Order",
-          "schema": {
-            "$ref": "#/backend/entities/Order"
-          },
-          "description": "Stores order information for a specific user.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "Unique identifier for the user."
-            },
-            {
-              "name": "orderId",
-              "description": "Unique identifier for the order."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/orders/{orderId}/orderItems/{orderItemId}",
-        "definition": {
-          "entityName": "OrderItem",
-          "schema": {
-            "$ref": "#/backend/entities/OrderItem"
-          },
-          "description": "Stores order item information for a specific order.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "Unique identifier for the user."
-            },
-            {
-              "name": "orderId",
-              "description": "Unique identifier for the order."
-            },
-            {
-              "name": "orderItemId",
-              "description": "Unique identifier for the order item."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/recommendations/{recommendationId}",
-        "definition": {
-          "entityName": "Recommendation",
-          "schema": {
-            "$ref": "#/backend/entities/Recommendation"
-          },
-          "description": "Stores product recommendations for a specific user.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "Unique identifier for the user."
-            },
-            {
-              "name": "recommendationId",
-              "description": "Unique identifier for the recommendation."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore data structure is designed to support a simple e-commerce application for selling coffee beans (Bean Boutique). It prioritizes authorization independence and clear data ownership. User data is stored under `/users/{userId}`. Products are stored in a single `/products` collection. Orders are stored under `/users/{userId}/orders/{orderId}` to clearly associate orders with users. OrderItems are stored as subcollections of Orders: `/users/{userId}/orders/{orderId}/orderItems/{orderItemId}`. Product Recommendations are stored under `/users/{userId}/recommendations/{recommendationId}`. This structure facilitates secure and efficient data access with clear ownership and avoids complex authorization logic. Authorization Independence is achieved by not requiring `get()` calls to parent documents for authorization.  QAPs are supported through the path-based ownership model for user-related data (orders, orderItems, recommendations) and a simple collection-based model for products. This allows for efficient listing of resources with security rules tied to the path and user ID."
-  }
 }
