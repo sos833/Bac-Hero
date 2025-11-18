@@ -24,7 +24,7 @@ service cloud.firestore {
         // Allow parent to read completed sessions for the dashboard
         allow get, list: if true; 
         // Allow student to manage their own sessions
-        allow read, write, delete: if isOwner(userId);
+        allow write, delete: if isOwner(userId);
       }
     }
   }
