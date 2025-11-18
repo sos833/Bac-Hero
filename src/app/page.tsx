@@ -3,11 +3,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { useUser, useFirebase, useMemoFirebase, useCollection, useDoc } from '@/firebase';
+import { useUser, useFirebase, useMemoFirebase } from '@/firebase/provider';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useDoc } from '@/firebase/firestore/use-doc';
+
 import { initiateAnonymousSignIn } from "@/firebase/non-blocking-login";
 import { collection, doc, addDoc, deleteDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import Switch from '@/components/Switch';
+
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement);
 
@@ -605,26 +610,38 @@ export default function Home() {
         }
     };
 
-    const handleGoogleSignIn = () => {
+    const handleGoogleSignIn = async () => {
         const provider = new GoogleAuthProvider();
-        signInWithPopup(auth, provider)
-            .then((result) => {
-                showToast('تم تسجيل الدخول بنجاح!', 'success');
-                const loggedInUser = result.user;
-                // Check if a code already exists for this user in Firestore first.
-                // We are already doing this via the `parentalCode` state which is fed by the `userSettings` doc.
-                if (!parentalCode) {
-                    generateParentalCode(loggedInUser.uid);
-                }
-            }).catch((error) => {
-                console.error("Authentication error:", error.code, error.message);
-                if (error.code === 'auth/operation-not-allowed') {
-                    showToast('خطأ: لم يتم تفعيل تسجيل الدخول بـ Google في إعدادات Firebase.', 'error');
-                } else {
-                    showToast('حدث خطأ أثناء تسجيل الدخول.', 'error');
-                }
-            });
+        try {
+            await signInWithRedirect(auth, provider);
+        } catch (error) {
+            console.error("Authentication error:", error.code, error.message);
+            if (error.code === 'auth/operation-not-allowed') {
+                showToast('خطأ: لم يتم تفعيل تسجيل الدخول بـ Google في إعدادات Firebase.', 'error');
+            } else {
+                showToast('حدث خطأ أثناء تسجيل الدخول.', 'error');
+            }
+        }
     };
+
+    useEffect(() => {
+        // This effect handles the redirect result after returning from Google sign-in
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result) {
+                    showToast('تم تسجيل الدخول بنجاح!', 'success');
+                    const loggedInUser = result.user;
+                    if (!parentalCode) {
+                        generateParentalCode(loggedInUser.uid);
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error("Redirect Authentication error:", error.code, error.message);
+                showToast('حدث خطأ أثناء إتمام عملية تسجيل الدخول.', 'error');
+            });
+    }, [auth, parentalCode]); // Re-run when auth object is available
+
 
     const generateParentalCode = (uid) => {
         const targetUid = uid || user?.uid;
@@ -866,8 +883,7 @@ export default function Home() {
                                                 grid: { color: 'rgba(255,255,255,0.1)' } 
                                             }, 
                                             x: { 
-                                                ticks: { color: 'white' }, 
-                                                grid: { display: false } 
+                                                ticks: { color: 'white' }, 												grid: { display: false } 
                                             } 
                                         } 
                                     }} 
@@ -1101,9 +1117,9 @@ export default function Home() {
                         <div className="timer-subject">{currentSession?.subject}</div>
                         <div className="timer-display">{`${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`}</div>
                         <div className="timer-controls">
-                            <button className={`timer-btn lock-btn ${isStrictFocus ? 'active' : ''}`} onClick={toggleStrictFocus} title={isStrictFocus ? 'إلغاء قفل التركيز' : 'تفعيل قفل التركيز'}>
-                                <i className={`fas ${isStrictFocus ? 'fa-lock' : 'fa-lock-open'}`}></i>
-                            </button>
+                             <div title={isStrictFocus ? 'إلغاء قفل التركيز' : 'تفعيل قفل التركيز'}>
+                                <Switch checked={isStrictFocus} onChange={toggleStrictFocus} />
+                            </div>
                             <button className="timer-btn pause-btn" onClick={togglePauseTimer}>
                                 <i className={`fas ${isTimerPaused ? 'fa-play' : 'fa-pause'}`}></i> {isTimerPaused ? 'استئناف' : 'إيقاف مؤقت'}
                             </button>
